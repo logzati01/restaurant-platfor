@@ -12,6 +12,7 @@ import {
   TicketPercent, 
   QrCode,
   Settings,
+  Users,
   Languages,
   Menu as MenuIcon,
   X
@@ -35,7 +36,8 @@ export const Sidebar = () => {
     { href: '/dashboard', label: t('لوحة التحكم', 'Dashboard'), icon: LayoutDashboard },
     { href: '/dashboard/orders', label: t('الطلبات الحية', 'Live Orders'), icon: ShoppingBag, badge: t('مباشر', 'LIVE') },
     { href: '/dashboard/menu', label: t('إدارة القائمة والوجبات', 'Menu & Dishes'), icon: UtensilsCrossed },
-    { href: '/dashboard/branches', label: t('الفروع والطاولات (QR)', 'Branches & Tables (QR)'), icon: Store },
+    { href: '/dashboard/branches', label: t('إدارة الفروع والطاولات', 'Branches & Tables'), icon: Store },
+    { href: '/dashboard/staff', label: t('الموظفون والصلاحيات', 'Staff & Roles'), icon: Users },
     { href: '/dashboard/coupons', label: t('الكوبونات والخصومات', 'Coupons & Discounts'), icon: TicketPercent },
     { href: '/dashboard/settings', label: t('إعدادات المطعم والشعار', 'Restaurant & Logo'), icon: Settings },
     { href: '/menu', label: t('معاينة منيو العميل', 'Customer Menu Preview'), icon: QrCode, target: '_blank' },

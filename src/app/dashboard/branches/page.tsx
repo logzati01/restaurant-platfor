@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLang } from '@/components/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { Store, QrCode, Plus, Printer, Phone, MapPin, Trash2, X } from 'lucide-react';
+import { Store, QrCode, Plus, Printer, Phone, MapPin, Trash2, X, Building2, Clock } from 'lucide-react';
 
 export default function BranchesPage() {
   const { t, lang } = useLang();
@@ -11,12 +11,17 @@ export default function BranchesPage() {
   const [tables, setTables] = useState<any[]>([]);
   const [baseUrl, setBaseUrl] = useState('');
 
+  // Modals
   const [showTableModal, setShowTableModal] = useState(false);
+  const [showBranchModal, setShowBranchModal] = useState(false);
+
+  // Forms
   const [tableForm, setTableForm] = useState({ table_number: '', capacity: 4, branch_id: '' });
+  const [branchForm, setBranchForm] = useState({ name: '', name_ar: '', city: '', address: '', phone: '', opening_time: '09:00', closing_time: '23:00' });
 
   const loadData = async () => {
     const { data: rData } = await supabase.from('restaurants').select('*').limit(1).single();
-    const { data: bData } = await supabase.from('branches').select('*');
+    const { data: bData } = await supabase.from('branches').select('*').order('created_at');
     const { data: tData } = await supabase.from('restaurant_tables').select('*').order('table_number');
     if (rData) setRestaurant(rData);
     if (bData) setBranches(bData);
@@ -29,6 +34,45 @@ export default function BranchesPage() {
     }
     loadData();
   }, []);
+
+  const handleAddBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!branchForm.name_ar) return;
+
+    const { data: res } = await supabase.from('restaurants').select('id').limit(1).single();
+    const restId = res?.id || '11111111-1111-1111-1111-111111111111';
+
+    const newBranch = {
+      restaurant_id: restId,
+      name: branchForm.name || branchForm.name_ar,
+      name_ar: branchForm.name_ar,
+      city: branchForm.city || 'Algiers',
+      address: branchForm.address,
+      phone: branchForm.phone,
+      is_active: true,
+    };
+
+    const { data } = await supabase.from('branches').insert([newBranch]).select().single();
+    if (data) {
+      setBranches(prev => [...prev, data]);
+    } else {
+      setBranches(prev => [...prev, { ...newBranch, id: Date.now().toString() }]);
+    }
+
+    setShowBranchModal(false);
+    setBranchForm({ name: '', name_ar: '', city: '', address: '', phone: '', opening_time: '09:00', closing_time: '23:00' });
+  };
+
+  const handleDeleteBranch = async (branchId: string) => {
+    if (branches.length <= 1) {
+      alert(t('لا يمكن حذف الفرع الوحيد للمطعم!', 'Cannot delete the only remaining branch!'));
+      return;
+    }
+    if (!confirm(t('حذف الفرع سيحذف الطاولات التابعة له، هل تريد المتابعة؟', 'Delete branch and related tables?'))) return;
+    setBranches(prev => prev.filter(b => b.id !== branchId));
+    await supabase.from('branches').delete().eq('id', branchId);
+    loadData();
+  };
 
   const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,41 +110,61 @@ export default function BranchesPage() {
       <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">{t('إدارة الفروع ورموز الطاولات (QR Code)', 'Branches & Table QR Management')}</h1>
-          <p className="text-xs text-slate-500 mt-1">{t('توليد وطباعة باركودات الطاولات الذكية للطلب المباشر وإدارة الفروع', 'Generate and print smart QR codes for instant table ordering')}</p>
+          <p className="text-xs text-slate-500 mt-1">{t('إضافة فروع جديدة، إدارة الطاولات، وتوليد بطاقات الباركود الذكية للطلب المباشر', 'Manage branches, add tables, and print QR ordering stand cards')}</p>
         </div>
 
-        <button
-          onClick={() => {
-            setTableForm({ table_number: `T-0${tables.length + 1}`, capacity: 4, branch_id: branches[0]?.id || '' });
-            setShowTableModal(true);
-          }}
-          className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md shadow-orange-600/20 transition-all"
-        >
-          <Plus size={16} />
-          <span>{t('إضافة طاولة جديدة', 'Add New Table')}</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowBranchModal(true)}
+            className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-4 py-2.5 rounded-xl transition-all border border-slate-200"
+          >
+            <Building2 size={16} className="text-orange-600" />
+            <span>{t('إضافة فرع جديد', 'Add Branch')}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setTableForm({ table_number: `T-0${tables.length + 1}`, capacity: 4, branch_id: branches[0]?.id || '' });
+              setShowTableModal(true);
+            }}
+            className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md shadow-orange-600/20 transition-all"
+          >
+            <Plus size={16} />
+            <span>{t('إضافة طاولة جديدة', 'Add Table')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Branches List */}
       <div className="space-y-4">
-        <h2 className="font-black text-slate-800 text-base">{t('فروع المطعم المسجلة', 'Registered Branches')}</h2>
+        <h2 className="font-black text-slate-800 text-base">{t('فروع المطعم المسجلة', 'Registered Branches')} ({branches.length})</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {branches.map((b) => (
-            <div key={b.id} className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-start gap-4">
-              <div className="p-3.5 bg-orange-50 text-orange-600 rounded-2xl">
-                <Store size={26} />
+            <div key={b.id} className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-start justify-between gap-4 relative group hover:border-orange-200 transition-all">
+              <div className="flex items-start gap-4">
+                <div className="p-3.5 bg-orange-50 text-orange-600 rounded-2xl shrink-0">
+                  <Store size={26} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-extrabold text-slate-900 text-base">{lang === 'ar' ? b.name_ar : b.name}</h3>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <MapPin size={14} className="text-slate-400" />
+                    <span>{b.address || t('العنوان الرئيسي', 'Main Address')}, {b.city || 'Algiers'}</span>
+                  </p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <Phone size={14} className="text-slate-400" />
+                    <span>{b.phone || '+213...'}</span>
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h3 className="font-extrabold text-slate-900 text-base">{lang === 'ar' ? b.name_ar : b.name}</h3>
-                <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                  <MapPin size={14} />
-                  <span>{b.address}, {b.city}</span>
-                </p>
-                <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                  <Phone size={14} />
-                  <span>{b.phone}</span>
-                </p>
-              </div>
+
+              <button
+                onClick={() => handleDeleteBranch(b.id)}
+                className="text-slate-300 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors"
+                title={t('حذف الفرع', 'Delete Branch')}
+              >
+                <Trash2 size={16} />
+              </button>
             </div>
           ))}
         </div>
@@ -109,7 +173,7 @@ export default function BranchesPage() {
       {/* Tables QR Cards Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-black text-slate-800 text-base">{t('بطاقات باركود الطاولات (جاهزة للطباعة والتوزيع)', 'Table QR Stand Cards (Print-Ready)')}</h2>
+          <h2 className="font-black text-slate-800 text-base">{t('بطاقات باركود الطاولات (جاهزة للطباعة والتوزيع)', 'Table QR Stand Cards (Print-Ready)')} ({tables.length})</h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -170,6 +234,95 @@ export default function BranchesPage() {
         </div>
       </div>
 
+      {/* Add Branch Modal */}
+      {showBranchModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-900 text-base">{t('إضافة فرع جديد للمطعم', 'Add New Branch')}</h3>
+              <button onClick={() => setShowBranchModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddBranch} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">{t('اسم الفرع (بالعربية)*', 'Branch Name (Arabic)*')}</label>
+                <input
+                  type="text"
+                  required
+                  value={branchForm.name_ar}
+                  onChange={(e) => setBranchForm({ ...branchForm, name_ar: e.target.value })}
+                  placeholder="مثال: فرع وهران - وسط المدينة"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">{t('اسم الفرع (بالإنجليزية)', 'Branch Name (English)')}</label>
+                <input
+                  type="text"
+                  value={branchForm.name}
+                  onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })}
+                  placeholder="e.g. Oran City Center Branch"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">{t('المدينة', 'City')}</label>
+                  <input
+                    type="text"
+                    value={branchForm.city}
+                    onChange={(e) => setBranchForm({ ...branchForm, city: e.target.value })}
+                    placeholder="Oran / Algiers"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">{t('رقم هاتف الفرع', 'Phone')}</label>
+                  <input
+                    type="text"
+                    value={branchForm.phone}
+                    onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })}
+                    placeholder="+213..."
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">{t('العنوان التفصيلي', 'Full Address')}</label>
+                <input
+                  type="text"
+                  value={branchForm.address}
+                  onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })}
+                  placeholder="شارع الأمير عبد القادر، وهران"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBranchModal(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
+                >
+                  {t('إلغاء', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black shadow-md shadow-orange-600/20"
+                >
+                  {t('حفظ الفرع', 'Save Branch')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Add Table Modal */}
       {showTableModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
@@ -202,6 +355,19 @@ export default function BranchesPage() {
                   onChange={(e) => setTableForm({ ...tableForm, capacity: Number(e.target.value) })}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium"
                 />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">{t('الفرع التابعة له', 'Branch')}</label>
+                <select
+                  value={tableForm.branch_id}
+                  onChange={(e) => setTableForm({ ...tableForm, branch_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-orange-500 outline-none bg-white"
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{lang === 'ar' ? b.name_ar : b.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-2">
