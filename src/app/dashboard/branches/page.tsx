@@ -6,6 +6,7 @@ import { Store, QrCode, Plus, Printer, Phone, MapPin, Trash2, X } from 'lucide-r
 
 export default function BranchesPage() {
   const { t, lang } = useLang();
+  const [restaurant, setRestaurant] = useState<any>({ name: 'RestoManager', name_ar: 'برجر آند جريل', logo_url: '' });
   const [branches, setBranches] = useState<any[]>([]);
   const [tables, setTables] = useState<any[]>([]);
   const [baseUrl, setBaseUrl] = useState('');
@@ -14,8 +15,10 @@ export default function BranchesPage() {
   const [tableForm, setTableForm] = useState({ table_number: '', capacity: 4, branch_id: '' });
 
   const loadData = async () => {
+    const { data: rData } = await supabase.from('restaurants').select('*').limit(1).single();
     const { data: bData } = await supabase.from('branches').select('*');
     const { data: tData } = await supabase.from('restaurant_tables').select('*').order('table_number');
+    if (rData) setRestaurant(rData);
     if (bData) setBranches(bData);
     if (tData) setTables(tData);
   };
@@ -127,6 +130,16 @@ export default function BranchesPage() {
                 >
                   <Trash2 size={16} />
                 </button>
+
+                {/* Restaurant Logo on Table Stand */}
+                <div className="flex items-center gap-2">
+                  {restaurant.logo_url ? (
+                    <img src={restaurant.logo_url} alt="Logo" className="w-8 h-8 rounded-xl object-cover border" />
+                  ) : (
+                    <span className="text-xl">🍔</span>
+                  )}
+                  <span className="font-extrabold text-xs text-slate-800">{lang === 'ar' ? restaurant.name_ar : restaurant.name}</span>
+                </div>
 
                 <div className="w-full bg-slate-900 text-white py-2 rounded-xl">
                   <span className="font-black text-sm uppercase tracking-wider">

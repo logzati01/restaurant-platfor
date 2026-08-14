@@ -30,6 +30,7 @@ function MenuContent() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const [restaurant, setRestaurant] = useState<any>({ name: 'RestoManager', name_ar: 'برجر آند جريل الفاخر', logo_url: '' });
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -40,8 +41,10 @@ function MenuContent() {
 
   useEffect(() => {
     async function load() {
+      const { data: rData } = await supabase.from('restaurants').select('*').limit(1).single();
       const { data: cats } = await supabase.from('categories').select('*').order('sort_order');
       const { data: prods } = await supabase.from('products').select('*').eq('is_available', true);
+      if (rData) setRestaurant(rData);
       if (cats) setCategories(cats);
       if (prods) setProducts(prods);
     }
@@ -181,9 +184,13 @@ function MenuContent() {
       <header className="bg-slate-900 text-white p-5 sticky top-0 z-30 shadow-lg">
         <div className="max-w-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-orange-600 rounded-2xl text-2xl font-black shadow-lg shadow-orange-600/30">🍔</div>
+            {restaurant.logo_url ? (
+              <img src={restaurant.logo_url} alt="Logo" className="w-11 h-11 rounded-2xl object-cover border border-slate-700 shadow-md" />
+            ) : (
+              <div className="p-2.5 bg-orange-600 rounded-2xl text-2xl font-black shadow-lg shadow-orange-600/30 flex items-center justify-center">🍔</div>
+            )}
             <div>
-              <h1 className="font-extrabold text-base tracking-tight">{t('برجر آند جريل الفاخر', 'Gourmet Burger & Grill')}</h1>
+              <h1 className="font-extrabold text-base tracking-tight">{lang === 'ar' ? restaurant.name_ar : restaurant.name}</h1>
               <span className="text-xs text-orange-400 font-bold flex items-center gap-1 mt-0.5">
                 <span>🍽️</span>
                 <span>{t('طاولة رقم', 'Table #')} {tableParam}</span>
