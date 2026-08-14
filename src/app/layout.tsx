@@ -1,13 +1,5 @@
 import './globals.css';
 import { LanguageProvider } from '@/components/LanguageContext';
-import { Cairo } from 'next/font/google';
-
-const cairo = Cairo({
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  display: 'swap',
-  variable: '--font-cairo',
-});
 
 export const metadata = {
   title: 'منصة إدارة المطاعم المتكاملة | RestoManager',
@@ -16,8 +8,13 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html className={cairo.variable}>
-      <body className={cairo.className}>
+    <html lang="ar" dir="rtl">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+      </head>
+      <body>
         <LanguageProvider>
           {children}
         </LanguageProvider>
