@@ -99,7 +99,7 @@ export default function DashboardOverview() {
         {/* Total Sales */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">{t('إجمالي المبيعات اليوم', 'Today's Total Sales')}</span>
+            <span className="text-xs font-medium text-slate-500">{t('إجمالي المبيعات اليوم', 'Today Total Sales')}</span>
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
               <TrendingUp size={20} />
             </div>
