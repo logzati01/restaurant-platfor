@@ -2,8 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLang } from '@/components/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { QRCodeSVG } from 'qrcode.react';
-import { Store, QrCode, Plus, Printer, Phone, MapPin, Download } from 'lucide-react';
+import { Store, QrCode, Plus, Printer, Phone, MapPin } from 'lucide-react';
 
 export default function BranchesPage() {
   const { t, lang } = useLang();
@@ -12,7 +11,9 @@ export default function BranchesPage() {
   const [baseUrl, setBaseUrl] = useState('');
 
   useEffect(() => {
-    setBaseUrl(window.location.origin);
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
     async function loadData() {
       const { data: bData } = await supabase.from('branches').select('*');
       const { data: tData } = await supabase.from('restaurant_tables').select('*');
@@ -23,7 +24,9 @@ export default function BranchesPage() {
   }, []);
 
   const handlePrintQR = (tableNum: string) => {
-    window.print();
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   };
 
   return (
@@ -69,7 +72,10 @@ export default function BranchesPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {tables.map((table) => {
-            const qrUrl = `${baseUrl}/menu?table=${table.table_number}`;
+            const currentOrigin = baseUrl || 'https://restaurant.app';
+            const qrUrl = `${currentOrigin}/menu?table=${table.table_number}`;
+            const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrUrl)}`;
+
             return (
               <div
                 key={table.id}
@@ -82,8 +88,8 @@ export default function BranchesPage() {
                 </div>
 
                 {/* QR Code Container */}
-                <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
-                  <QRCodeSVG value={qrUrl} size={150} level="H" />
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-inner flex items-center justify-center">
+                  <img src={qrImageSrc} alt={`QR Table ${table.table_number}`} className="w-[150px] h-[150px] object-contain rounded-xl" />
                 </div>
 
                 <div className="space-y-1">
