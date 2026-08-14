@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLang } from '@/components/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { Store, QrCode, Plus, Printer, Phone, MapPin, Trash2, X, Building2, Clock } from 'lucide-react';
+import { Store, QrCode, Plus, Printer, Phone, MapPin, Trash2, X, Building2 } from 'lucide-react';
 
 export default function BranchesPage() {
   const { t, lang } = useLang();
@@ -98,10 +98,113 @@ export default function BranchesPage() {
     await supabase.from('restaurant_tables').delete().eq('id', tableId);
   };
 
-  const handlePrintQR = (tableNum: string) => {
-    if (typeof window !== 'undefined') {
-      window.print();
-    }
+  // Dedicated Print Function for ONLY the selected table card
+  const handlePrintSingleTable = (table: any) => {
+    const win = window.open('', '_blank', 'width=500,height=700');
+    if (!win) return;
+
+    const currentOrigin = baseUrl || window.location.origin;
+    const qrUrl = `${currentOrigin}/menu?table=${table.table_number}`;
+    const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrUrl)}`;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <title>بطاقة طاولة رقم ${table.table_number}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800;900&display=swap" rel="stylesheet">
+        <style>
+          @page { size: portrait; margin: 10mm; }
+          body { font-family: 'Cairo', sans-serif; text-align: center; margin: 0; padding: 20px; background: #fff; }
+          .card { 
+            border: 3px solid #0f172a; 
+            border-radius: 28px; 
+            padding: 35px 25px; 
+            max-width: 320px; 
+            margin: 20px auto; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.06); 
+          }
+          .resto-header { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+          }
+          .resto-name { 
+            font-size: 20px; 
+            font-weight: 900; 
+            color: #0f172a; 
+          }
+          .table-badge { 
+            background: #0f172a; 
+            color: #fff; 
+            padding: 10px 18px; 
+            border-radius: 16px; 
+            font-weight: 900; 
+            font-size: 20px; 
+            letter-spacing: 1px;
+            margin-bottom: 25px; 
+          }
+          .qr-box { 
+            padding: 16px; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 24px; 
+            display: inline-block; 
+            margin-bottom: 20px; 
+            background: #fff;
+          }
+          .qr-img { 
+            width: 200px; 
+            height: 200px; 
+            display: block; 
+          }
+          .instruction { 
+            font-size: 15px; 
+            font-weight: 900; 
+            color: #ea580c; 
+            margin-bottom: 6px; 
+          }
+          .sub-text { 
+            font-size: 12px; 
+            color: #64748b; 
+            margin-bottom: 8px; 
+          }
+          .url { 
+            font-size: 10px; 
+            color: #94a3b8; 
+            font-family: monospace; 
+            word-break: break-all;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="resto-header">
+            ${restaurant.logo_url ? `<img src="${restaurant.logo_url}" style="width:45px;height:45px;border-radius:14px;object-fit:cover;">` : '<span style="font-size:28px;">🍔</span>'}
+            <span class="resto-name">${lang === 'ar' ? restaurant.name_ar : restaurant.name}</span>
+          </div>
+
+          <div class="table-badge">طاولة رقم ${table.table_number}</div>
+
+          <div class="qr-box">
+            <img src="${qrImageSrc}" class="qr-img" alt="QR Code" />
+          </div>
+
+          <div class="instruction">امسح الكود لفتح القائمة والطلب 📱</div>
+          <div class="sub-text">اختر وجباتك المفضلة وسنحضرها فوراً لطاولتك</div>
+          <div class="url">${qrUrl}</div>
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); window.close(); };
+        </script>
+      </body>
+      </html>
+    `;
+
+    win.document.write(printContent);
+    win.document.close();
   };
 
   return (
@@ -110,7 +213,7 @@ export default function BranchesPage() {
       <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">{t('إدارة الفروع ورموز الطاولات (QR Code)', 'Branches & Table QR Management')}</h1>
-          <p className="text-xs text-slate-500 mt-1">{t('إضافة فروع جديدة، إدارة الطاولات، وتوليد بطاقات الباركود الذكية للطلب المباشر', 'Manage branches, add tables, and print QR ordering stand cards')}</p>
+          <p className="text-xs text-slate-500 mt-1">{t('إضافة فروع جديدة، إدارة الطاولات، وطباعة بطاقة كل طاولة منفصلة بجودة عالية', 'Manage branches, add tables, and print individual stand cards')}</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -222,11 +325,11 @@ export default function BranchesPage() {
                 </div>
 
                 <button
-                  onClick={() => handlePrintQR(table.table_number)}
-                  className="w-full py-2.5 bg-slate-100 hover:bg-orange-600 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  onClick={() => handlePrintSingleTable(table)}
+                  className="w-full py-2.5 bg-slate-100 hover:bg-orange-600 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
                   <Printer size={15} />
-                  <span>{t('طباعة بطاقة الطاولة', 'Print Card')}</span>
+                  <span>{t('طباعة بطاقة هذه الطاولة فقط', 'Print This Card Only')}</span>
                 </button>
               </div>
             );
