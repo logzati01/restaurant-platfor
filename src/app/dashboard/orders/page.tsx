@@ -8,12 +8,10 @@ import {
   ChefHat, 
   CheckCircle, 
   Printer, 
-  Bell, 
   Volume2, 
-  Filter,
   RefreshCw,
   Trash2,
-  CheckCheck
+  Inbox
 } from 'lucide-react';
 
 export default function LiveOrdersPage() {
@@ -22,60 +20,28 @@ export default function LiveOrdersPage() {
   const [filter, setFilter] = useState('all');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [restaurant, setRestaurant] = useState<any>({ name: 'RestoManager', name_ar: 'برجر آند جريل الفاخر', logo_url: '' });
+  const [loading, setLoading] = useState(true);
 
   const loadOrders = async () => {
-    const { data: rData } = await supabase.from('restaurants').select('*').limit(1).single();
-    if (rData) setRestaurant(rData);
+    try {
+      const { data: rData } = await supabase.from('restaurants').select('*').limit(1).single();
+      if (rData) setRestaurant(rData);
 
-    const { data } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .order('created_at', { ascending: false });
 
-    if (data && data.length > 0) {
-      setOrders(data);
-    } else {
-      setOrders([
-        { 
-          id: 'ord-1', 
-          order_number: 105, 
-          customer_name: 'طاولة رقم 01', 
-          order_type: 'dine_in', 
-          status: 'pending', 
-          total_amount: 1300, 
-          created_at: new Date().toISOString(),
-          order_items: [
-            { product_name: 'دبل ترافل برجر', quantity: 1, total_price: 850 },
-            { product_name: 'بطاطس مقلية بالجبن', quantity: 1, total_price: 450 }
-          ]
-        },
-        { 
-          id: 'ord-2', 
-          order_number: 104, 
-          customer_name: 'طاولة رقم 02', 
-          order_type: 'takeaway', 
-          status: 'in_kitchen', 
-          total_amount: 1050, 
-          created_at: new Date().toISOString(),
-          order_items: [
-            { product_name: 'برجر دجاج مقرمش', quantity: 1, total_price: 700 },
-            { product_name: 'موهيتو ليمون ونعناع', quantity: 1, total_price: 350 }
-          ]
-        },
-        { 
-          id: 'ord-3', 
-          order_number: 103, 
-          customer_name: 'طاولة رقم 03', 
-          order_type: 'dine_in', 
-          status: 'completed', 
-          total_amount: 2400, 
-          created_at: new Date().toISOString(),
-          order_items: [
-            { product_name: 'دبل ترافل برجر', quantity: 2, total_price: 1700 },
-            { product_name: 'برجر دجاج مقرمش', quantity: 1, total_price: 700 }
-          ]
-        }
-      ]);
+      if (data) {
+        setOrders(data);
+      } else {
+        setOrders([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setOrders([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,7 +49,7 @@ export default function LiveOrdersPage() {
     loadOrders();
 
     const channel = supabase
-      .channel('realtime_orders')
+      .channel('realtime_orders_feed')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         loadOrders();
         if (soundEnabled && payload.eventType === 'INSERT') {
@@ -103,26 +69,26 @@ export default function LiveOrdersPage() {
     await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
   };
 
-  // Delete a single order
+  // Delete a single order from Supabase permanently
   const handleDeleteOrder = async (orderId: string, orderNumber: any) => {
     if (!confirm(`${t('هل تريد بالتأكيد حذف الطلب رقم', 'Delete order #')} #${orderNumber} ${t('نهائياً؟', 'permanently?')}`)) return;
     setOrders(prev => prev.filter(o => o.id !== orderId));
     await supabase.from('orders').delete().eq('id', orderId);
   };
 
-  // Clear all completed orders
+  // Clear all completed orders from Supabase permanently
   const handleClearCompleted = async () => {
     const completedOrders = orders.filter(o => o.status === 'completed');
     if (completedOrders.length === 0) {
       alert(t('لا توجد طلبات مكتملة لمسحها حالياً.', 'No completed orders to clear.'));
       return;
     }
-    if (!confirm(t('هل تريد مسح جميع الطلبات المكتملة من الشاشة؟', 'Clear all completed orders from screen?'))) return;
+    if (!confirm(t('هل تريد مسح جميع الطلبات المكتملة من الشاشة وقاعدة البيانات؟', 'Clear all completed orders from database?'))) return;
     setOrders(prev => prev.filter(o => o.status !== 'completed'));
     await supabase.from('orders').delete().eq('status', 'completed');
   };
 
-  // Dedicated Thermal Receipt Print Popup (80mm standard receipt)
+  // Dedicated Thermal Receipt Print Popup
   const handlePrintReceipt = (order: any) => {
     const win = window.open('', '_blank', 'width=400,height=600');
     if (!win) return;
@@ -256,113 +222,127 @@ export default function LiveOrdersPage() {
         </div>
       </div>
 
-      {/* Orders Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredOrders.map((order) => (
-          <div
-            key={order.id}
-            className={`bg-white rounded-3xl border-2 transition-all shadow-sm flex flex-col justify-between overflow-hidden ${
-              order.status === 'pending' ? 'border-amber-400 ring-4 ring-amber-400/10' : order.status === 'in_kitchen' ? 'border-blue-400' : 'border-slate-200'
-            }`}
-          >
-            {/* Card Header */}
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg text-slate-900">#{order.order_number}</span>
-                <span className="text-xs px-2.5 py-0.5 rounded-lg bg-slate-200 font-bold text-slate-700">
-                  {order.customer_name}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-bold">
-                  {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <button
-                  onClick={() => handleDeleteOrder(order.id, order.order_number)}
-                  className="text-slate-300 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
-                  title={t('حذف هذا الطلب نهائياً', 'Delete this order')}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-
-            {/* Customer & Items */}
-            <div className="p-5 flex-1 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">{t('المبلغ الإجمالي:', 'Total:')}</span>
-                <span className="font-black text-orange-600 text-base">{order.total_amount} DZD</span>
-              </div>
-
-              {/* Items List */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                {order.order_items?.map((item: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between text-xs text-slate-700">
-                    <span className="font-semibold">
-                      <span className="font-black text-orange-600">{item.quantity}x</span> {item.product_name}
-                    </span>
-                    <span className="text-slate-400 font-medium">{item.total_price} DZD</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Status Action Buttons & Dedicated Thermal Receipt Print */}
-            <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-              <button
-                onClick={() => handlePrintReceipt(order)}
-                className="p-2.5 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors flex items-center gap-1 text-xs font-bold"
-                title={t('طباعة إيصال الفاتورة', 'Print receipt')}
-              >
-                <Printer size={16} />
-              </button>
-
-              <div className="flex items-center gap-1.5 flex-1 justify-end">
-                {order.status === 'pending' && (
-                  <button
-                    onClick={() => updateOrderStatus(order.id, 'in_kitchen')}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                  >
-                    <ChefHat size={16} />
-                    <span>{t('تحويل للمطبخ', 'Send to Kitchen')}</span>
-                  </button>
-                )}
-                {order.status === 'in_kitchen' && (
-                  <button
-                    onClick={() => updateOrderStatus(order.id, 'ready')}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                  >
-                    <CheckCircle size={16} />
-                    <span>{t('جاهز للتسليم', 'Mark Ready')}</span>
-                  </button>
-                )}
-                {order.status === 'ready' && (
-                  <button
-                    onClick={() => updateOrderStatus(order.id, 'completed')}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                  >
-                    <span>{t('إتمام الطلب', 'Complete Order')}</span>
-                  </button>
-                )}
-                {order.status === 'completed' && (
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-xs font-black text-emerald-600 py-1">
-                      ✓ {t('طلب مكتمل', 'Completed')}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteOrder(order.id, order.order_number)}
-                      className="text-xs font-bold text-rose-500 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-lg"
-                    >
-                      {t('إزالة', 'Remove')}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Orders Grid / Empty State */}
+      {filteredOrders.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center space-y-4 shadow-sm">
+          <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+            <Inbox size={32} />
           </div>
-        ))}
-      </div>
+          <div className="space-y-1 max-w-sm mx-auto">
+            <h3 className="font-black text-lg text-slate-800">{t('لا توجد طلبات حالياً في هذا القسم', 'No active orders in this view')}</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              {t('عندما يقوم الزبائن بمسح باركود الطاولات وإرسال وجباتهم من المنيو، ستصل الطلبات هنا فوراً ومباشرة مع رنين التنبيه الصوتي.', 'New orders placed by customers from table QR menus will appear here instantly in real-time.')}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredOrders.map((order) => (
+            <div
+              key={order.id}
+              className={`bg-white rounded-3xl border-2 transition-all shadow-sm flex flex-col justify-between overflow-hidden ${
+                order.status === 'pending' ? 'border-amber-400 ring-4 ring-amber-400/10' : order.status === 'in_kitchen' ? 'border-blue-400' : 'border-slate-200'
+              }`}
+            >
+              {/* Card Header */}
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-lg text-slate-900">#{order.order_number}</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-lg bg-slate-200 font-bold text-slate-700">
+                    {order.customer_name}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-bold">
+                    {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteOrder(order.id, order.order_number)}
+                    className="text-slate-300 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                    title={t('حذف هذا الطلب نهائياً', 'Delete this order')}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Customer & Items */}
+              <div className="p-5 flex-1 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">{t('المبلغ الإجمالي:', 'Total:')}</span>
+                  <span className="font-black text-orange-600 text-base">{order.total_amount} DZD</span>
+                </div>
+
+                {/* Items List */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  {order.order_items?.map((item: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between text-xs text-slate-700">
+                      <span className="font-semibold">
+                        <span className="font-black text-orange-600">{item.quantity}x</span> {item.product_name}
+                      </span>
+                      <span className="text-slate-400 font-medium">{item.total_price} DZD</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Action Buttons */}
+              <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => handlePrintReceipt(order)}
+                  className="p-2.5 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors flex items-center gap-1 text-xs font-bold"
+                  title={t('طباعة إيصال الفاتورة', 'Print receipt')}
+                >
+                  <Printer size={16} />
+                </button>
+
+                <div className="flex items-center gap-1.5 flex-1 justify-end">
+                  {order.status === 'pending' && (
+                    <button
+                      onClick={() => updateOrderStatus(order.id, 'in_kitchen')}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <ChefHat size={16} />
+                      <span>{t('تحويل للمطبخ', 'Send to Kitchen')}</span>
+                    </button>
+                  )}
+                  {order.status === 'in_kitchen' && (
+                    <button
+                      onClick={() => updateOrderStatus(order.id, 'ready')}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <CheckCircle size={16} />
+                      <span>{t('جاهز للتسليم', 'Mark Ready')}</span>
+                    </button>
+                  )}
+                  {order.status === 'ready' && (
+                    <button
+                      onClick={() => updateOrderStatus(order.id, 'completed')}
+                      className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <span>{t('إتمام الطلب', 'Complete Order')}</span>
+                    </button>
+                  )}
+                  {order.status === 'completed' && (
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-black text-emerald-600 py-1">
+                        ✓ {t('طلب مكتمل', 'Completed')}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteOrder(order.id, order.order_number)}
+                        className="text-xs font-bold text-rose-500 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-lg"
+                      >
+                        {t('إزالة', 'Remove')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
